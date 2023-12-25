@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>{% block title %} Bestands details: {% endblock %}</h1>
+    <hr>
+        <span class="badge badge-primary">{{ items['id'] }}</span><span class="badge badge-primary">{{ items['transcript'] }}</span><br>
+        <audio controls="controls" autobuffer="autobuffer">
+            <source src="data:audio/mpeg;base64,{{ w }}">
+        </audio><br>
+        <ul>
+            <li><h6>UUID:</h6>{{ items['id'] }}</li>
+            <li><h6>Bestandsnaam:</h6> {{ items['file_name'] }}</li>
+            <li><h6>Framerate:</h6> {{ items['framerate'] }}</li>
+            <li><h6>Datum aangemaakt:</h6> {{ items['create_date'] }}</li>
+            <li><h6>Datum upload:</h6> {{ items['upload_date'] }}</li>
+            <li><h6>Lengte:</h6> {{ items['lenght'] }}</li>
+            <li><h6>Omschrijving:</h6> {{ items['description'] }}</li>
+        </ul>
+        
+    <hr>
+{% endblock %}
