@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>{% block title %} Test {% endblock %}</h1>
+    <hr>
+    {% for item in items %}
+        <a href=" {{ url_for('post', post_id=item['id']) }} "><span class="badge badge-primary">{{ item['id'] }}</span></a>&emsp;{{ item['file_name'] }}<br>
+        <audio controls="controls" autobuffer="autobuffer">
+            <source src="data:audio/mpeg;base64,{{ w }}">
+        </audio>
+    {% endfor %}
+
+    <hr>
+{% endblock %}
