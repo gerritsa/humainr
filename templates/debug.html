@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block title %} Debug {% endblock %}
+
+{% block content %}
+  <div class="container">
+    <br>
+    <h1>Debug pagina:</h1>
+    <br>
+    <h3>Files op server die klaar staan om te verwerken</h3>
+    <table id="localfiles" class="table table-striped">
+        <thead>
+          <tr>
+            <th>Filename</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for filename in localfiles %}
+        <tr>
+            <td>{{ filename }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <hr>
+    <br>
+    <h3>Files op het AWS s3server</h3>
+    <table id="s3files" class="table table-striped">
+        <thead>
+          <tr>
+            <th>Filename</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for file in s3files %}
+        <tr>
+            <td>{{ file.Key }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <hr>
+    <br>
+    <h3>Records in de AWS DynamoDB</h3>
+    <table id="s3records" class="table table-striped">
+        <thead>
+          <tr>
+            <th>Filename</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for record in records %}
+        <tr>
+            <td>{{ record['file_name'] }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <hr>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+{% endblock %}

@@ -10,8 +10,8 @@
 6. Maak een GUI om twee schermen te tonen. Een met een lijst met files en een met de metadata en transcriptie.
 
 ### Eventueel extra opdracht:
-1. Doe extra conversie op het audiobestand
-2. Maak extra optimalisatie
+1. Extra conversie op het audiobestand
+2. Extra optimalisatie
 
 
 ### Hierna zalf bedachte "verbeteringen":
@@ -21,7 +21,6 @@
     - verwijderen files/transcriptie
     - afspelen van audio + tonen transcriptie
 2. Zet bestanden om naar een UUID
-
 
 ### Extra informatie van Nick
 1. Installeer

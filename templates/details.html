@@ -1,21 +1,43 @@
 {% extends 'base.html' %}
 
 {% block content %}
+    <br>
     <h1>{% block title %} Bestands details: {% endblock %}</h1>
-    <hr>
-        <span class="badge badge-primary">{{ items['id'] }}</span><span class="badge badge-primary">{{ items['transcript'] }}</span><br>
+    <div class="container">
+        <table id="data" class="table table-striped">
+            <thead>
+            <tr>
+                <th>UUID:</th>
+                <th>Bestandsnaam:</th>
+                <th>Samplerate:</th>
+                <th>Datum aangemaakt:</th>
+                <th>Datum upload: </th>
+                <th>Lengte:</th>
+                <th>Omschrijving:</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td>{{ items['id'] }}</td>
+                <td>{{ items['file_name'] }}</td>
+                <td>{{ items['framerate'] }}</td>
+                <td>{{ items['create_date'] }}</td>
+                <td>{{ items['upload_date'] }}</td>
+                <td>{{ items['lenght'] }}</td>
+                <td>{{ items['description'] }}</td>
+                <td></td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="container">
         <audio controls="controls" autobuffer="autobuffer">
-            <source src="data:audio/mpeg;base64,{{ w }}">
+            <source src="data:audio/mpeg;base64,{{ audiofile }}">
         </audio><br>
-        <ul>
-            <li><h6>UUID:</h6>{{ items['id'] }}</li>
-            <li><h6>Bestandsnaam:</h6> {{ items['file_name'] }}</li>
-            <li><h6>Framerate:</h6> {{ items['framerate'] }}</li>
-            <li><h6>Datum aangemaakt:</h6> {{ items['create_date'] }}</li>
-            <li><h6>Datum upload:</h6> {{ items['upload_date'] }}</li>
-            <li><h6>Lengte:</h6> {{ items['lenght'] }}</li>
-            <li><h6>Omschrijving:</h6> {{ items['description'] }}</li>
-        </ul>
-        
+    </div>
+    <hr>
+    <ul>
+        <li><h6>Transcription:</h6>{{ items['transcript'] }}</li>
+    </ul>
     <hr>
 {% endblock %}

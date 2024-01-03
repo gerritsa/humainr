@@ -1,10 +1,40 @@
 {% extends 'base.html' %}
 
+{% block title %} Main {% endblock %}
+
 {% block content %}
-    <h1>{% block title %} Verwerkte bestanden: {% endblock %}</h1>
+  <div class="container">
+    <br>
+    <h1>Verwerkte bestanden:</h1>
+    <table id="data" class="table table-striped">
+        <thead>
+          <tr>
+            <th>File UUID</th>
+            <th>Filename</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for item in items %}
+        <tr>
+            <td><a href=" {{ url_for('details', id=item['id']) }} ">{{ item['id'] }}</a></td>
+            <td>{{ item['file_name'] }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+    </table>
     <hr>
-    {% for item in items %}
-        <a href=" {{ url_for('details', id=item['id']) }} "><span class="badge badge-primary">{{ item['id'] }}</span></a>&emsp;{{ item['file_name'] }}<br>
-    {% endfor %}
-    <hr>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    $(document).ready(function () {
+      $('#data').DataTable({
+        columns: [
+          {orderable: true, searchable: true},
+          {orderable: true, searchable: true},
+        ],
+      });
+    });
+  </script>
 {% endblock %}

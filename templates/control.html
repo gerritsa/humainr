@@ -1,17 +1,30 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<h1>{% block title %} Control {% endblock %}</h1>
-<form method="post" action="/control">
-    <input type="submit" value="Verwerk" name="verwerk"/>
-    <input type="submit" value="VALUE2" name="action2"/>
-</form>
-<br>
-<title>Upload new File</title>
-<h1>Upload new File</h1>
-<form method=post enctype=multipart/form-data action="/control">
-  <input type=file name=file>
-  <input type="submit" value="Upload" name="upload"/>
-</form>
+{% block title %} Control {% endblock %}
 
-{% endblock %}
+{% block content %}
+  <div class="container">
+    <br>
+    <h1>Control</h1>
+    <br>
+    <h3>Batch verwerking:</h3>
+    <form method="post" action="/control">
+      <div class="row" justify-content-md-center>
+        <div class="col-sm">
+          <input type="submit" value="Verwerk" name="verwerk"/>
+        </div>
+        <div class="col-xl-auto">
+          <input type="submit" value="Reset" name="reset"/>
+        </div>
+      </div>    
+    </form>
+    <br>
+  </div>
+  <div class="container" bg-dark>
+    <h3>Upload new File:</h3>
+    <form method=post enctype=multipart/form-data action="/control">
+      <input type=file name=file>
+      <input type="submit" value="Upload" name="upload"/>
+    </form>
+  </div>
+  {% endblock %}
