@@ -17,7 +17,7 @@ import torchaudio
 from transformers import Speech2TextProcessor, Speech2TextForConditionalGeneration
 
 ### Voor transcribe Wav2Vec2
-from transformers import Wav2Vec2Tokenizer, Wav2Vec2ForCTC, Wav2Vec2Processor
+from transformers import Wav2Vec2Tokenizer, Wav2Vec2ForCTC, Wav2Vec2Processor, AutoTokenizer, AutoProcessor, AutoModelForCTC, Wav2Vec2ProcessorWithLM
 from pyctcdecode import build_ctcdecoder
 
 ### Controleer of de SSO token al is geauthoriseerd.
@@ -118,7 +118,8 @@ def process_server(s3, bucketname, bucket, table, sync_path, arch_path):
             create_date = timestamp.strftime('%Y-%m-%d')
             sampleinfo = mediainfo(sync_path + file)
             upload_s3file(bucket, sync_path, file, uuid_token)
-            transcriptie = transcribe_audiofile_beamlm_chunk(BytesIO(load_s3file(s3, bucketname, uuid_token)))
+            #transcriptie = transcribe_audiofile_beamlm_chunk(BytesIO(load_s3file(s3, bucketname, uuid_token)))
+            transcriptie = transcribe_audiofile_chunk_beam_wordoff(BytesIO(load_s3file(s3, bucketname, uuid_token)), debug = True)
             shutil.move(sync_path + file, arch_path + file)
             save_record(table, uuid_token, file, str(sampleinfo['sample_rate']), transcriptie, create_date, str(sampleinfo['duration']))
     return
@@ -455,3 +456,139 @@ def transcribe_audiofile_beamlm_chunk(audio_bytes, debug = False):
 
     if (debug): print(transcription.lower())
     return transcription.lower()
+
+
+### Maak een transcriptie volgens het Wav2Vec2 model
+# Met een pyctcdecoder beamfunctie en taalmodel
+# Met chunk functie en striding.
+# LET OP: Er zit nog een bug in deze functie waar 
+# model._get_feat_extract_output_lengths(stride_len)
+# Niet een correcte grote voor de striding weergeeft na
+# transformatie naar logits. Waardoor en af en toe een frame
+# Teveel word toegevoegd op de grens van de chunk. Dit kan een
+# foutieve prediction geven in de beamsearch mogelijk.
+def transcribe_audiofile_chunk_beam_wordoff(audio_bytes, debug = False):
+    # Laden van het pre-getrainde model en de tokenizer
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if (debug): print('Start transciptie')
+    model_name = "facebook/wav2vec2-large-960h-lv60-self"
+    model = AutoModelForCTC.from_pretrained(model_name).to(device)
+    processor = AutoProcessor.from_pretrained(model_name)
+    # import model, feature extractor, tokenizer
+
+    ### Haal de gewenste samplerate van het model op.
+    fixed_samplerate = processor.feature_extractor.sampling_rate
+
+    # Laden van de woordenlijst en het taalmodel voor decodering
+    # Dit is de beamsearch decoder van pyctcdecorder
+    vocab_list = list(processor.tokenizer.get_vocab())
+    with open("kenlm/language_model_unigrams.txt") as f:
+        unigram_list = [t for t in f.read().strip().split("\n")]
+    decoder = build_ctcdecoder(
+        vocab_list,
+        kenlm_model_path='kenlm/4-gram.bin',
+        unigrams=unigram_list,
+        alpha = 1.5,
+        beta = 1.5,
+        unk_score_offset=-10.0,
+        lm_score_boundary=True
+        )
+
+    processor_with_lm = Wav2Vec2ProcessorWithLM(
+        feature_extractor=processor.feature_extractor,
+        tokenizer=processor.tokenizer,
+        decoder=decoder
+    )
+
+    # Omzetten van de audiobytes naar een tensorarray
+    waveform, sample_rate = torchaudio.load(audio_bytes, format="mp3")
+
+    # Resample waveform als de sample_rate niet overeen met de sample_rate waarop het model getrained is
+    if (sample_rate != fixed_samplerate):
+        waveform = torchaudio.functional.resample(waveform, orig_freq=sample_rate, new_freq=fixed_samplerate)
+        sample_rate = fixed_samplerate
+    
+    # Zet waveform om naar mono
+    waveform = torch.mean(waveform, dim=0).unsqueeze(0)
+
+    # Configuratie voor het verdelen van audiochunks
+    chunk_duration = 30
+    striding_duration = 3
+    lenght_waveform = len(waveform[0])
+    chunk_len = chunk_duration*sample_rate
+    stride_len = striding_duration*sample_rate
+    # TODO: Bug ui volgende regel halen (lijkt niet altijd juiste waarde te geven)
+    tensor_stride_len = int(model._get_feat_extract_output_lengths(stride_len))
+    all_preds = torch.tensor(()).to(device)
+
+    if (debug): print()
+    if (debug): print('------------------------------- DEBUG ----------------------------------')
+    if (debug): print('waveform: ' + str(lenght_waveform) + ' samples.')
+    if (debug): print('chunk_len: ' + str(chunk_len) + ' samples.')
+    if (debug): print('stride_len: ' + str(stride_len) + ' samples.')
+    if (debug): print('tensor_stride_len: ' + str(tensor_stride_len) + ' frames.') 
+    if (debug): print('------------------------------- DEBUG ----------------------------------')
+    if (debug): print()
+
+    for start in range(0, lenght_waveform, chunk_len):
+        # Bepaal de start en eindposities van de huidige chunk
+        begin = start - stride_len if start != 0 else 0
+        end = min(start + chunk_len + stride_len, lenght_waveform)
+
+        # Extraheren van de huidige chunk van de waveform
+        chunk = waveform[0][begin:end]
+        input_values = processor_with_lm(chunk, sampling_rate=sample_rate, return_tensors="pt").to(device)
+
+        if (debug): print()
+        if (debug): print('------------------------------- DEBUG ----------------------------------')
+        if (debug): print('chunk: ' + str(len(chunk)) + ' samples.')
+        if (debug): print('input_values: ' + str(len(input_values['input_values'][0])) + ' samples.')
+
+        # Verkrijg de logits voor de huidige chunk
+        with torch.no_grad():
+            logits = model(**input_values).logits
+            #logits = model(input_values).logits[0].cpu().numpy()
+
+        # Bepaal het gedeelte van de logits dat nodig is (afhankelijk van de stride)
+        begin_input = tensor_stride_len if start != 0 else 0
+        begin_output = len(logits[0]) - tensor_stride_len if end < lenght_waveform else len(logits[0])
+        
+        if (debug): print('begin: ' + str(begin) + ' samples.')
+        if (debug): print('end: ' + str(end) + ' samples.')
+        if (debug): print('begin_input: ' + str(begin_input) + ' frames.')
+        if (debug): print('begin_output: ' + str(begin_output) + ' frames.')
+        if (debug): print('logits: ' + str(len(logits[0])) + ' frames.')
+        if (debug): print(logits[0][0])
+
+        logits_stripped = logits[0][begin_input:begin_output]
+        
+        if (debug): print('logits_stripped: ' + str(len(logits_stripped)) + ' frames.')
+        if (debug): print(logits_stripped)
+
+        all_preds = torch.cat((all_preds, logits_stripped), 0)
+        
+        if (debug): print('all_preds: ' + str(len(all_preds[0])))
+        if (debug): print('------------------------------- DEBUG ----------------------------------')
+        if (debug): print()
+
+    # Selecteer het relevante gedeelte van de logits en voeg ze samen
+    decode_logits = all_preds.cpu().numpy() 
+    #transcription = decoder.decode(decode_logits)
+    # retrieve word stamps (analogous commands for `output_char_offsets`)
+    outputs = processor_with_lm.decode(decode_logits, output_word_offsets=True)
+    transcription = processor_with_lm.decode(decode_logits, output_word_offsets=False)
+    # compute `time_offset` in seconds as product of downsampling ratio and sampling_rate
+    time_offset = model.config.inputs_to_logits_ratio / processor.feature_extractor.sampling_rate
+
+    word_offsets = [
+        {
+            "word": d["word"],
+            "start_time": round(d["start_offset"] * time_offset, 2),
+            "end_time": round(d["end_offset"] * time_offset, 2),
+        }
+        for d in outputs.word_offsets
+    ]
+
+    print(word_offsets)
+    if (debug): print(transcription['text'].lower())
+    return transcription['te1xt'].lower()
